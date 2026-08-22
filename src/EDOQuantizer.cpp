@@ -19,8 +19,8 @@ struct EDOQuantizer : Module {
 		NUM_LIGHTS
 	};
 
-	static constexpr int MIN_EDO = 2;
-	static constexpr int MAX_EDO = 24;
+	static constexpr int MIN_EDO = 1;
+	static constexpr int MAX_EDO = 48;
 
 	int edo = 12;
 	bool enabledNotes[MAX_EDO] = {};
@@ -269,7 +269,7 @@ struct EDOQuantizerCounterDisplay : DigitalDisplay {
 	EDOQuantizerCounterDisplay() {
 		fontPath = asset::system("res/fonts/DSEG7ClassicMini-BoldItalic.ttf");
 		textPos = Vec(11.8, 16.0); // centered in the 8 x 6 mm window
-		bgText = "24";
+		bgText = "48";
 		fontSize = 14.4;
 		align = NVG_ALIGN_CENTER;
 	}
