@@ -1,38 +1,19 @@
 # EDO QNT
 
-Мой собственный плагин модулей для [VCV Rack](https://vcvrack.com/) (микротоналика).
+My personal plugin for [VCV Rack](https://vcvrack.com/).
 
-## Модули
+## Modules
 
 ### EDO Quantizer
 
-Квантизатор с выбираемым количеством тонов в октаве (EDO — Equal Division of the Octave).
+Quantizer with a selectable number of tones per octave (EDO — Equal Division of the Octave).
 
-- Счётчик сверху `▾12▴` — выбирает количество тонов в октаве (от 2 до 24), удержание кнопки повторяет.
-- Экран с «палочками» — гамма: клик по тону включает/выключает его, перетаскивание закрашивает ряд.
-  Жёлтая — звучит сейчас, янтарная — включена, серая — выключена.
-- `IN` — вход 1 В/октаву, `OUT` — квантизированный выход 1 В/октаву. Полифоничный.
-- Состояние (EDO и гамма) сохраняется в патче; контекстное меню — включить/выключить все ноты.
+- `▼ 12 ▲` counter — sets the number of tones per octave (2 to 24).
+- Tone strip display — the scale: click a tone to toggle it, drag to paint a row.
+  Yellow — currently playing, amber — enabled, gray — disabled.
+- `IN` — 1 V/octave input, `OUT` — quantized 1 V/octave output. Polyphonic.
+- State (EDO and scale) is saved with the patch; context menu — enable/disable all notes.
 
-## Сборка
+## License
 
-Нужен [Rack SDK](https://vcvrack.com/downloads) для вашей ОС:
-
-```sh
-RACK_DIR=/путь/к/Rack-SDK make
-```
-
-(по умолчанию SDK ожидается в `../Rack-SDK`). Папка плагина уже лежит в
-`Rack2/plugins-win-x64/VitaocyEDO`, поэтому `make` собирает `plugin.dll` прямо рядом
-с исходниками — Rack подхватит его после перезапуска, ничего копировать не нужно.
-`make dist` понадобится только для упаковки архива `dist/*.vcvplugin` при распространении.
-
-## Структура
-
-- `src/plugin.cpp`, `src/plugin.hpp` — точка входа плагина и общие виджеты
-- `src/EDOQuantizer.cpp` — модуль EDO Quantizer
-- `res/` — панели (светлая/тёмная SVG)
-
-## Лицензия
-
-GPL-3.0-or-later (код написан по образцу VCVRack/Fundamental).
+GPL-3.0-or-later (written following the VCVRack/Fundamental example).
