@@ -1,5 +1,3 @@
-# EDO QNT
-
 My personal plugins for [VCV Rack](https://vcvrack.com/).
 
 ## Modules
