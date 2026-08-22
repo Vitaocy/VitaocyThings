@@ -1,0 +1,6 @@
+# Build output
+build/
+dist/
+plugin.dll
+plugin.dylib
+plugin.so

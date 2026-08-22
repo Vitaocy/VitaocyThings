@@ -1,0 +1,27 @@
+{
+  "slug": "VitaocyThings",
+  "name": "EDO QNT",
+  "version": "2.0.0",
+  "license": "GPL-3.0-or-later",
+  "brand": "VitaocyThings",
+  "author": "Vitaocy",
+  "authorEmail": "",
+  "pluginUrl": "https://github.com/Vitaocy/VitaocyThings",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "minRackVersion": "2.4.0",
+  "modules": [
+    {
+      "slug": "EDOQuantizer",
+      "name": "EDO Quantizer",
+      "description": "Microtonal quantizer with selectable equal division of the octave",
+      "keywords": "EDO, microtonal",
+      "manualUrl": "",
+      "tags": [
+        "Quantizer",
+        "Utility",
+        "Polyphonic"
+      ]
+    }
+  ]
+}
