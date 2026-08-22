@@ -1,6 +1,6 @@
 # EDO QNT
 
-My personal plugin for [VCV Rack](https://vcvrack.com/).
+My personal plugins for [VCV Rack](https://vcvrack.com/).
 
 ## Modules
 
