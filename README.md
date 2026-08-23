@@ -14,4 +14,4 @@ Quantizer with a selectable number of tones per octave (EDO — Equal Division o
 
 ## License
 
-GPL-3.0-or-later (written following the VCVRack/Fundamental example).
+GPL-3.0-or-later
