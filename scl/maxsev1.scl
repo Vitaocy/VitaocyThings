@@ -1,0 +1,13 @@
+! maxsev1.scl
+!
+First maximal seven odd limit harmony epimorphic seven note scale
+! x^7-14*x^5-20*x^4+16*x^3+40*x^2+16*x
+7
+!
+8/7
+5/4
+10/7
+3/2
+12/7
+7/4
+2/1

@@ -8,4 +8,5 @@ void init(Plugin* p) {
 	pluginInstance = p;
 
 	p->addModel(modelEDOQuantizer);
+	p->addModel(modelSCLRNG);
 }

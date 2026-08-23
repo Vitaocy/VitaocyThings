@@ -12,6 +12,16 @@ Quantizer with a selectable number of tones per octave (EDO — Equal Division o
 - `IN` — 1 V/octave input, `OUT` — quantized 1 V/octave output. Polyphonic.
 - State (EDO and scale) is saved with the patch; context menu — enable/disable all notes.
 
+### SCL QNT
+
+Quantizer that loads random Scala `.scl` scales from the bundled `scl/` folder.
+
+- `<` / `>` navigation — walk through the history of loaded scales; pressing `>`
+  past the end loads a new random scale.
+- The scale name is shown vertically on the display.
+- The scale history is saved with the patch.
+- `IN` — 1 V/octave input, `OUT` — quantized 1 V/octave output. Polyphonic.
+
 ## License
 
 GPL-3.0-or-later

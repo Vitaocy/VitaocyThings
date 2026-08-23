@@ -22,6 +22,18 @@
         "Utility",
         "Polyphonic"
       ]
+    },
+    {
+      "slug": "SCLRNG",
+      "name": "SCL QNT",
+      "description": "Quantizer with randomly loaded Scala .scl scales",
+      "keywords": "scl, scala, microtonal, quantizer",
+      "manualUrl": "",
+      "tags": [
+        "Quantizer",
+        "Utility",
+        "Polyphonic"
+      ]
     }
   ]
 }

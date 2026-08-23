@@ -1,0 +1,37 @@
+! minerva12-orwell-tempered.scl
+Minerva[12] (99/9&176/175) 11-limit hobbit, tuned to POTE orwell instead of POTE minerva
+! 0 to 12 generators of Orwell[13], minus the 2
+12
+!
+114.296
+228.592
+271.426
+385.722
+500.018
+585.686
+699.982
+814.278
+928.574
+971.408
+1085.704
+2/1
+! Note that the above scale is exactly the same as [[minerva12]],
+! with the sole exception that the tuning map has been changed
+! so that it "accidentally" tempers out the rest of the commas of orwell
+!
+!! preminerva12.scl
+! 5-limit transversal of the above scale
+! 12
+!!
+! 16/15
+! 256/225
+! 75/64
+! 5/4
+! 4/3
+! 45/32
+! 3/2
+! 8/5
+! 128/75
+! 225/128
+! 15/8
+! 2/1

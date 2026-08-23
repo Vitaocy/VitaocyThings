@@ -347,27 +347,6 @@ struct EDOArrowButton : OpaqueWidget {
 };
 
 
-/** Panel silkscreen text, drawn with a font instead of SVG paths. */
-struct EDOQuantizerLabel : Widget {
-	std::string text;
-	std::string fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
-	NVGcolor color = nvgRGB(0x1f, 0x1f, 0x1f);
-	float fontSize = 10;
-
-	void draw(const DrawArgs& args) override {
-		std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
-		if (!font)
-			return;
-		nvgFontFaceId(args.vg, font->handle);
-		nvgFontSize(args.vg, fontSize);
-		nvgTextLetterSpacing(args.vg, 1);
-		nvgFillColor(args.vg, color);
-		nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_CENTER);
-		nvgText(args.vg, box.size.x / 2, box.size.y / 2, text.c_str(), NULL);
-	}
-};
-
-
 struct EDOQuantizerWidget : ModuleWidget {
 	EDOQuantizerWidget(EDOQuantizer* module) {
 		setModule(module);
@@ -381,7 +360,7 @@ struct EDOQuantizerWidget : ModuleWidget {
 		NVGcolor labelColor = settings::preferDarkPanels ? nvgRGB(0xeb, 0xeb, 0xeb) : nvgRGB(0x1f, 0x1f, 0x1f);
 
 		// Title
-		EDOQuantizerLabel* title = createWidget<EDOQuantizerLabel>(mm2px(Vec(0, 4)));
+		PanelLabel* title = createWidget<PanelLabel>(mm2px(Vec(0, 4)));
 		title->box.size = mm2px(Vec(20.32, 7));
 		title->fontPath = asset::plugin(pluginInstance, "res/fonts/RobotoCondensed-Bold.ttf");
 		title->text = "EDO QNT";
@@ -418,7 +397,7 @@ struct EDOQuantizerWidget : ModuleWidget {
 		addOutput(createOutputCentered<ThemedPJ301MPort>(mm2px(Vec(15.24, 112.5)), module, EDOQuantizer::PITCH_OUTPUT));
 
 		// Jack labels below the ports
-		EDOQuantizerLabel* inLabel = createWidget<EDOQuantizerLabel>(mm2px(Vec(1.08, 117.6)));
+		PanelLabel* inLabel = createWidget<PanelLabel>(mm2px(Vec(1.08, 117.6)));
 		inLabel->box.size = mm2px(Vec(8, 3.5));
 		inLabel->fontPath = asset::plugin(pluginInstance, "res/fonts/RobotoCondensed-Regular.ttf");
 		inLabel->text = "IN";
@@ -426,7 +405,7 @@ struct EDOQuantizerWidget : ModuleWidget {
 		inLabel->color = labelColor;
 		addChild(inLabel);
 
-		EDOQuantizerLabel* outLabel = createWidget<EDOQuantizerLabel>(mm2px(Vec(11.24, 117.6)));
+		PanelLabel* outLabel = createWidget<PanelLabel>(mm2px(Vec(11.24, 117.6)));
 		outLabel->box.size = mm2px(Vec(8, 3.5));
 		outLabel->fontPath = asset::plugin(pluginInstance, "res/fonts/RobotoCondensed-Regular.ttf");
 		outLabel->text = "OUT";

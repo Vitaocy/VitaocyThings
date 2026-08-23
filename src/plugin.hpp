@@ -8,6 +8,7 @@ using namespace rack;
 extern Plugin* pluginInstance;
 
 extern Model* modelEDOQuantizer;
+extern Model* modelSCLRNG;
 
 
 struct DigitalDisplay : Widget {
@@ -54,5 +55,26 @@ struct DigitalDisplay : Widget {
 			nvgText(args.vg, textPos.x, textPos.y, text.c_str(), NULL);
 		}
 		Widget::drawLayer(args, layer);
+	}
+};
+
+
+/** Panel silkscreen text, drawn with a font instead of SVG paths. */
+struct PanelLabel : Widget {
+	std::string text;
+	std::string fontPath = asset::system("res/fonts/ShareTechMono-Regular.ttf");
+	NVGcolor color = nvgRGB(0x1f, 0x1f, 0x1f);
+	float fontSize = 10;
+
+	void draw(const DrawArgs& args) override {
+		std::shared_ptr<Font> font = APP->window->loadFont(fontPath);
+		if (!font)
+			return;
+		nvgFontFaceId(args.vg, font->handle);
+		nvgFontSize(args.vg, fontSize);
+		nvgTextLetterSpacing(args.vg, 1);
+		nvgFillColor(args.vg, color);
+		nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_CENTER);
+		nvgText(args.vg, box.size.x / 2, box.size.y / 2, text.c_str(), NULL);
 	}
 };
