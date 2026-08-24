@@ -6,5 +6,5 @@ plugin.dylib
 plugin.so
 
 # Personal build config (machine-specific paths)
-Makefile
+local.mk
 Fundamental-2

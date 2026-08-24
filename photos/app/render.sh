@@ -32,8 +32,9 @@ PLUGIN_COPY="$USER_DIR/plugins-win-x64/VitaocyThings"
 rm -rf "$USER_DIR"
 mkdir -p "$PLUGIN_COPY"
 
-# Copy the plugin without the heavy/unneeded folders
-tar -C "$PLUGIN_DIR" --exclude=scl --exclude=build --exclude=dep --exclude=.git --exclude=photos -cf - . | tar -C "$PLUGIN_COPY" -xf -
+# Copy only what Rack needs: plugin binary, manifest, res, license
+cp -r "$PLUGIN_DIR/res" "$PLUGIN_COPY/"
+cp -r "$PLUGIN_DIR/plugin.dll" "$PLUGIN_DIR/plugin.json" "$PLUGIN_DIR/LICENSE-GPLv3.txt" "$PLUGIN_COPY/"
 
 # A few sample scales so SCL QNT has something to display
 mkdir -p "$PLUGIN_COPY/scl"

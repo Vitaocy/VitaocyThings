@@ -433,4 +433,4 @@ struct EDOQuantizerWidget : ModuleWidget {
 };
 
 
-Model* modelEDOQuantizer = createModel<EDOQuantizer, EDOQuantizerWidget>("EDOQuantizer");
+Model* modelEDOQuantizer = createModel<EDOQuantizer, EDOQuantizerWidget>("EDOQNT");

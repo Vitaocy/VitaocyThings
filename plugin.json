@@ -1,18 +1,18 @@
 {
   "slug": "VitaocyThings",
-  "name": "EDO QNT",
+  "name": "VitaocyThings",
   "version": "2.0.0",
   "license": "GPL-3.0-or-later",
   "brand": "VitaocyThings",
   "author": "Vitaocy",
-  "authorEmail": "",
+  "authorEmail": "tionetwoki@gmail.com",
   "pluginUrl": "https://github.com/Vitaocy/VitaocyThings",
   "manualUrl": "",
   "sourceUrl": "",
   "minRackVersion": "2.4.0",
   "modules": [
     {
-      	"slug": "EDOQuantizer",
+      	"slug": "EDOQNT",
       	"name": "EDO QNT",
       "description": "Microtonal quantizer with selectable equal division of the octave",
       "keywords": "EDO, microtonal",
@@ -24,7 +24,7 @@
       ]
     },
     {
-      "slug": "SCLRNG",
+      "slug": "SCLQNT",
       "name": "SCL QNT",
       "description": "Quantizer with randomly loaded Scala .scl scales",
       "keywords": "scl, scala, microtonal, quantizer",

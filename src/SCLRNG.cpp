@@ -783,4 +783,4 @@ struct SCLRNGWidget : ModuleWidget {
 };
 
 
-Model* modelSCLRNG = createModel<SCLRNG, SCLRNGWidget>("SCLRNG");
+Model* modelSCLRNG = createModel<SCLRNG, SCLRNGWidget>("SCLQNT");
