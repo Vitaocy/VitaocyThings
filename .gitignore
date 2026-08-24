@@ -4,3 +4,6 @@ dist/
 plugin.dll
 plugin.dylib
 plugin.so
+
+# Personal build config (machine-specific paths)
+Makefile

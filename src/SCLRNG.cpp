@@ -161,8 +161,8 @@ struct SCLRNG : Module {
 		randomScale();
 	}
 
-	/** Picks a random .scl file, loads it and appends it to the history. */
-	void randomScale() {
+	/** Loads a random .scl file, retrying a few files. Returns false if nothing loads. */
+	bool loadRandomScale() {
 		// Cache the file list after the first call, so 5000+ files are not rescanned
 		static std::vector<std::string> files;
 		static bool filesLoaded = false;
@@ -173,8 +173,22 @@ struct SCLRNG : Module {
 			}
 			filesLoaded = true;
 		}
+		if (files.empty())
+			return false;
 
-		if (files.empty()) {
+		for (int attempt = 0; attempt < 20; attempt++) {
+			std::string file = files[random::u32() % files.size()];
+			if (file == currentFile && files.size() > 1)
+				continue;
+			if (loadScale(file))
+				return true;
+		}
+		return false;
+	}
+
+	/** Appends a random scale to the end of the history. */
+	void randomScale() {
+		if (!loadRandomScale()) {
 			std::lock_guard<std::mutex> lock(scaleMutex);
 			scale = {0.f};
 			enabled = {1};
@@ -183,30 +197,31 @@ struct SCLRNG : Module {
 			currentFile = "";
 			return;
 		}
-
-		// Try a few random files, avoiding the one currently loaded
-		for (int attempt = 0; attempt < 20; attempt++) {
-			std::string file = files[random::u32() % files.size()];
-			if (file == currentFile && files.size() > 1)
-				continue;
-			if (loadScale(file)) {
-				history.push_back(file);
-				index = (int) history.size() - 1;
-				if (history.size() > MAX_HISTORY) {
-					history.erase(history.begin());
-					index--;
-				}
-				return;
-			}
+		history.push_back(currentFile);
+		index = (int) history.size() - 1;
+		if (history.size() > MAX_HISTORY) {
+			history.erase(history.begin());
+			index--;
 		}
+	}
 
-		// Nothing could be parsed, fall back to a plain octave scale
-		std::lock_guard<std::mutex> lock(scaleMutex);
-		scale = {0.f};
-		enabled = {1};
-		playing = {0};
-		description = "Could not parse any .scl file";
-		currentFile = "";
+	/** Picks a random scale and inserts it right after the current one. */
+	void insertRandomScale() {
+		if (!loadRandomScale()) {
+			std::lock_guard<std::mutex> lock(scaleMutex);
+			scale = {0.f};
+			enabled = {1};
+			playing = {0};
+			description = "No .scl files found";
+			currentFile = "";
+			return;
+		}
+		history.insert(history.begin() + index + 1, currentFile);
+		index++;
+		if (history.size() > MAX_HISTORY) {
+			history.erase(history.begin());
+			index--;
+		}
 	}
 
 	/** Loads a scale from the scl directory by filename. */
@@ -754,7 +769,7 @@ struct SCLRNGWidget : ModuleWidget {
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuItem("Random scale", "", [=]() {
-			module->randomScale();
+			module->insertRandomScale();
 		}));
 		menu->addChild(createMenuItem("Choose scala file", "", [=]() {
 			char* path = osdialog_file(OSDIALOG_OPEN, module->sclDir.c_str(), NULL, NULL);
