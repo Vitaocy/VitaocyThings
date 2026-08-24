@@ -12,8 +12,8 @@
   "minRackVersion": "2.4.0",
   "modules": [
     {
-      "slug": "EDOQuantizer",
-      "name": "EDO Quantizer",
+      	"slug": "EDOQuantizer",
+      	"name": "EDO QNT",
       "description": "Microtonal quantizer with selectable equal division of the octave",
       "keywords": "EDO, microtonal",
       "manualUrl": "",
@@ -31,6 +31,18 @@
       "manualUrl": "",
       "tags": [
         "Quantizer",
+        "Utility",
+        "Polyphonic"
+      ]
+    },
+    {
+      "slug": "VOGLI",
+      "name": "V/O GLI",
+      "description": "Pitch glider with glide time, curve shape and glide chance",
+      "keywords": "glide, portamento, pitch, slew",
+      "manualUrl": "",
+      "tags": [
+        "Slew limiter",
         "Utility",
         "Polyphonic"
       ]

@@ -9,4 +9,5 @@ void init(Plugin* p) {
 
 	p->addModel(modelEDOQuantizer);
 	p->addModel(modelSCLRNG);
+	p->addModel(modelVOGLI);
 }

@@ -9,6 +9,7 @@ extern Plugin* pluginInstance;
 
 extern Model* modelEDOQuantizer;
 extern Model* modelSCLRNG;
+extern Model* modelVOGLI;
 
 
 struct DigitalDisplay : Widget {
