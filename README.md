@@ -61,7 +61,7 @@ Pitch glider: on each pitch change it glides from the previous pitch to the new 
 - `CURVE` — glide character: exponential, linear or logarithmic; the curve
   preview on the display follows the knob.
 - `CHANCE` — probability that the glide triggers instead of jumping (0 to 100%).
-- `CV input` for each control: an incoming signal (envelope, LFO, anything).
+- `CV` for each knob - for controlling the module parameters, an incoming signal (envelope, LFO, anything).
   At full depth a ±10 V signal sweeps the entire range of the control.
 - `IN` — 1 V/octave input, `OUT` — glided 1 V/octave output. Polyphonic.
 

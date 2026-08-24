@@ -48,6 +48,11 @@ struct VOGLI : Module {
 	// A 10 V CV signal sweeps the full knob range at full amount
 	static constexpr float CV_DEPTH = 0.1f;
 
+	// Effective knob values with the CV amount (not the live signal), for the knob arc
+	float timeBase = 0.5f;
+	float curveBase = 0.5f;
+	float chanceBase = 1.f;
+
 	float lastPitch[MAX_POLY] = {};
 	float glideStart[MAX_POLY] = {};
 	float glideTarget[MAX_POLY] = {};
@@ -70,21 +75,31 @@ struct VOGLI : Module {
 		configBypass(PITCH_INPUT, PITCH_OUTPUT);
 	}
 
-	/** Effective curve value for channel 0, used by the curve preview. */
+	/** Effective curve value with live CV for channel 0, used by the curve preview. */
 	float getCurve() {
-		return clamp(params[CURVE_PARAM].getValue() + inputs[CURVE_CV_INPUT].getVoltage() * params[CURVE_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
+		return clamp(curveBase + inputs[CURVE_CV_INPUT].getVoltage() * params[CURVE_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
+	}
+
+	/** CV contribution (after the amount knob) for a control, channel 0. */
+	float cvIn(InputIds input, ParamIds amount) {
+		return inputs[input].getVoltage() * params[amount].getValue() * CV_DEPTH;
 	}
 
 	void process(const ProcessArgs& args) override {
+		// Refresh the knob base values (params are only changed by the UI thread)
+		timeBase = params[TIME_PARAM].getValue();
+		curveBase = params[CURVE_PARAM].getValue();
+		chanceBase = params[CHANCE_PARAM].getValue();
+
 		int channels = std::max(inputs[PITCH_INPUT].getChannels(), 1);
 
 		for (int c = 0; c < channels; c++) {
 			float pitch = inputs[PITCH_INPUT].getVoltage(c);
 
 			// Knob values, externally modulatable via CV scaled by the amount knob
-			float timeParam = clamp(params[TIME_PARAM].getValue() + inputs[TIME_CV_INPUT].getPolyVoltage(c) * params[TIME_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
-			float curveParam = clamp(params[CURVE_PARAM].getValue() + inputs[CURVE_CV_INPUT].getPolyVoltage(c) * params[CURVE_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
-			float chance = clamp(params[CHANCE_PARAM].getValue() + inputs[CHANCE_CV_INPUT].getPolyVoltage(c) * params[CHANCE_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
+			float timeParam = clamp(timeBase + inputs[TIME_CV_INPUT].getPolyVoltage(c) * params[TIME_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
+			float curveParam = clamp(curveBase + inputs[CURVE_CV_INPUT].getPolyVoltage(c) * params[CURVE_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
+			float chance = clamp(chanceBase + inputs[CHANCE_CV_INPUT].getPolyVoltage(c) * params[CHANCE_AMOUNT_PARAM].getValue() * CV_DEPTH, 0.f, 1.f);
 
 			float time = TIME_MIN * std::pow(10.f, timeParam * std::log10(TIME_MAX / TIME_MIN));
 			// Curve exponent: 0.1 = exponential (fast start), 1 = linear, 10 = logarithmic
@@ -177,6 +192,72 @@ struct VOGLICurveDisplay : LedDisplay {
 };
 
 
+/** Value (0..1) to screen angle for drawing arcs along the knob travel. */
+static float knobAngle(float value, float minAngle, float maxAngle) {
+	return -M_PI / 2 + (minAngle + value * (maxAngle - minAngle));
+}
+
+/** Draws a circular arc segment as a polyline. */
+static void drawArc(NVGcontext* vg, Vec c, float r, float a0, float a1) {
+	nvgBeginPath(vg);
+	int segs = 24;
+	for (int i = 0; i <= segs; i++) {
+		float a = a0 + (a1 - a0) * i / segs;
+		float x = c.x + std::cos(a) * r;
+		float y = c.y + std::sin(a) * r;
+		if (i == 0)
+			nvgMoveTo(vg, x, y);
+		else
+			nvgLineTo(vg, x, y);
+	}
+	nvgStroke(vg);
+}
+
+/** Main knob with a CV range arc: a gray arc shows how far CV can push the knob
+past its current position, and a yellow arc shows the live CV offset. The arcs
+are drawn on the knob face at 10% transparency so the knob stays readable. */
+struct CVArcKnob : RoundSmallBlackKnob {
+	VOGLI* module;
+	VOGLI::InputIds cvInput;
+	VOGLI::ParamIds amountParam;
+
+	void drawLayer(const DrawArgs& args, int layer) override {
+		if (layer != 1 || !module)
+			return;
+
+		// Current knob position
+		float base = 0.f;
+		if (paramId == VOGLI::TIME_PARAM) base = module->timeBase;
+		else if (paramId == VOGLI::CURVE_PARAM) base = module->curveBase;
+		else if (paramId == VOGLI::CHANCE_PARAM) base = module->chanceBase;
+		base = clamp(base, 0.f, 1.f);
+
+		Vec c = box.size.div(2);
+		float r = box.size.x / 2 + 2.f;
+
+		// Gray: the reachable range set by the CV amount knob, independent of the signal.
+		// A full-scale (10 V) CV signal sweeps the whole knob, so the bounds are
+		// simply the amount knob's position around the current knob value.
+		float reach = module->params[amountParam].getValue();
+		if (reach > 0.001f) {
+			float lo = clamp(base - reach, 0.f, 1.f);
+			float hi = clamp(base + reach, 0.f, 1.f);
+			nvgStrokeWidth(args.vg, 1.8f);
+			nvgStrokeColor(args.vg, nvgRGBA(0x40, 0x40, 0x40, 230));
+			drawArc(args.vg, c, r, knobAngle(lo, minAngle, maxAngle), knobAngle(hi, minAngle, maxAngle));
+		}
+
+		// Yellow: where the live CV signal currently sits
+		float cv = module->cvIn(cvInput, amountParam);
+		if (std::abs(cv) > 0.001f) {
+			float live = clamp(base + cv, 0.f, 1.f);
+			nvgStrokeColor(args.vg, nvgRGBA(0xff, 0xd7, 0x14, 230));
+			drawArc(args.vg, c, r, knobAngle(std::min(base, live), minAngle, maxAngle), knobAngle(std::max(base, live), minAngle, maxAngle));
+		}
+	}
+};
+
+
 struct VOGLIWidget : ModuleWidget {
 	VOGLIWidget(VOGLI* module) {
 		setModule(module);
@@ -214,7 +295,13 @@ struct VOGLIWidget : ModuleWidget {
 		curveLabel->color = dimColor;
 		addChild(curveLabel);
 
-		addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(7.56, 36.5)), module, VOGLI::CURVE_PARAM));
+		{
+			CVArcKnob* k = createParamCentered<CVArcKnob>(mm2px(Vec(7.56, 36.5)), module, VOGLI::CURVE_PARAM);
+			k->module = module;
+			k->cvInput = VOGLI::CURVE_CV_INPUT;
+			k->amountParam = VOGLI::CURVE_AMOUNT_PARAM;
+			addParam(k);
+		}
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(15.35, 41)), module, VOGLI::CURVE_AMOUNT_PARAM));
 		addInput(createInputCentered<ThemedPJ301MPort>(mm2px(Vec(7.56, 45.5)), module, VOGLI::CURVE_CV_INPUT));
 
@@ -227,7 +314,13 @@ struct VOGLIWidget : ModuleWidget {
 		timeLabel->color = dimColor;
 		addChild(timeLabel);
 
-		addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(12.76, 63.5)), module, VOGLI::TIME_PARAM));
+		{
+			CVArcKnob* k = createParamCentered<CVArcKnob>(mm2px(Vec(12.76, 63.5)), module, VOGLI::TIME_PARAM);
+			k->module = module;
+			k->cvInput = VOGLI::TIME_CV_INPUT;
+			k->amountParam = VOGLI::TIME_AMOUNT_PARAM;
+			addParam(k);
+		}
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(4.97, 68)), module, VOGLI::TIME_AMOUNT_PARAM));
 		addInput(createInputCentered<ThemedPJ301MPort>(mm2px(Vec(12.76, 72.5)), module, VOGLI::TIME_CV_INPUT));
 
@@ -240,7 +333,13 @@ struct VOGLIWidget : ModuleWidget {
 		chanceLabel->color = dimColor;
 		addChild(chanceLabel);
 
-		addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(7.56, 90.5)), module, VOGLI::CHANCE_PARAM));
+		{
+			CVArcKnob* k = createParamCentered<CVArcKnob>(mm2px(Vec(7.56, 90.5)), module, VOGLI::CHANCE_PARAM);
+			k->module = module;
+			k->cvInput = VOGLI::CHANCE_CV_INPUT;
+			k->amountParam = VOGLI::CHANCE_AMOUNT_PARAM;
+			addParam(k);
+		}
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(15.35, 95)), module, VOGLI::CHANCE_AMOUNT_PARAM));
 		addInput(createInputCentered<ThemedPJ301MPort>(mm2px(Vec(7.56, 99.5)), module, VOGLI::CHANCE_CV_INPUT));
 
