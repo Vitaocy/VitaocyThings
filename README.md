@@ -2,16 +2,16 @@ My personal plugins for [VCV Rack](https://vcvrack.com/).
 
 ## Modules
 
+### EDO Quantizer
+
 <details>
-  <summary>EDO Quantizer</summary>
+  <summary>Show module</summary>
 
   <div>
     <img src="photos/EDOQNT.png" />
   </div>
 
 </details>
-
-### EDO Quantizer
 
 Quantizer with a selectable number of tones per octave (EDO — Equal Division of the Octave).
 
@@ -21,18 +21,18 @@ Quantizer with a selectable number of tones per octave (EDO — Equal Division o
 - `IN` — 1 V/octave input, `OUT` — quantized 1 V/octave output. Polyphonic.
 - State (EDO and scale) is saved with the patch; context menu — enable/disable all notes.
 
+---
+
+### SCL QNT
+
 <details>
-  <summary>SCL QNT</summary>
+  <summary>Show module</summary>
 
   <div>
     <img src="photos/SCLQNT.png" />
   </div>
 
 </details>
-
----
-
-### SCL QNT
 
 Quantizer that loads random Scala `.scl` scales from the bundled `scl/` folder.
 
@@ -42,18 +42,18 @@ Quantizer that loads random Scala `.scl` scales from the bundled `scl/` folder.
 - The scale history is saved with the patch.
 - `IN` — 1 V/octave input, `OUT` — quantized 1 V/octave output. Polyphonic.
 
+---
+
+### V/O GLI
+
 <details>
-  <summary>V/O GLI</summary>
+  <summary>Show module</summary>
 
   <div>
     <img src="photos/VOGLI.png" />
   </div>
 
 </details>
-
----
-
-### V/O GLI
 
 Pitch glider: on each pitch change it glides from the previous pitch to the new one.
 
