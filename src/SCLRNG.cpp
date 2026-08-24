@@ -131,13 +131,16 @@ struct SCLRNG : Module {
 	};
 
 	static constexpr int MAX_HISTORY = 256;
+	static constexpr int MAX_TONES = 128;
 
 	std::string sclDir;
 	std::vector<std::string> history; // filenames of previously loaded scales
 	int index = -1;
 
-	// Current scale, read on the audio thread
+	// Current scale state, guarded by scaleMutex
 	std::vector<float> scale = {0.f};
+	std::vector<int> enabled = {1};
+	std::vector<int> playing = {0};
 	std::mutex scaleMutex;
 	std::string description;
 	std::string currentFile;
@@ -174,6 +177,8 @@ struct SCLRNG : Module {
 		if (files.empty()) {
 			std::lock_guard<std::mutex> lock(scaleMutex);
 			scale = {0.f};
+			enabled = {1};
+			playing = {0};
 			description = "No .scl files found";
 			currentFile = "";
 			return;
@@ -198,6 +203,8 @@ struct SCLRNG : Module {
 		// Nothing could be parsed, fall back to a plain octave scale
 		std::lock_guard<std::mutex> lock(scaleMutex);
 		scale = {0.f};
+		enabled = {1};
+		playing = {0};
 		description = "Could not parse any .scl file";
 		currentFile = "";
 	}
@@ -214,9 +221,13 @@ struct SCLRNG : Module {
 		std::vector<float> cents;
 		if (!parseScl(text, desc, cents))
 			return false;
+		if ((int) cents.size() > MAX_TONES)
+			cents.resize(MAX_TONES);
 
 		std::lock_guard<std::mutex> lock(scaleMutex);
 		scale = cents;
+		enabled.assign(cents.size(), 1);
+		playing.assign(cents.size(), 0);
 		description = desc;
 		currentFile = file;
 		return true;
@@ -267,6 +278,8 @@ struct SCLRNG : Module {
 	void process(const ProcessArgs& args) override {
 		std::lock_guard<std::mutex> lock(scaleMutex);
 		const std::vector<float>& scl = scale;
+		int n = (int) scl.size();
+		std::vector<int> playing(n, 0);
 
 		int channels = std::max(inputs[PITCH_INPUT].getChannels(), 1);
 		for (int c = 0; c < channels; c++) {
@@ -274,15 +287,30 @@ struct SCLRNG : Module {
 			int octave = (int) std::floor(cents / 1200.f);
 			float pos = cents - octave * 1200.f;
 
-			// Closest interval within the octave
-			float best = scl[0];
-			for (float interval : scl) {
-				if (std::abs(interval - pos) < std::abs(best - pos))
-					best = interval;
+			// Closest enabled interval within the octave
+			int bestIdx = -1;
+			float bestDist = 1e30f;
+			for (int i = 0; i < n; i++) {
+				if (!enabled[i])
+					continue;
+				float d = std::abs(scl[i] - pos);
+				if (d < bestDist) {
+					bestDist = d;
+					bestIdx = i;
+				}
 			}
-			outputs[PITCH_OUTPUT].setVoltage((octave * 1200.f + best) / 1200.f, c);
+
+			if (bestIdx < 0) {
+				// All tones disabled: pass the input through unquantized
+				outputs[PITCH_OUTPUT].setVoltage(inputs[PITCH_INPUT].getVoltage(c), c);
+			}
+			else {
+				playing[bestIdx] = 1;
+				outputs[PITCH_OUTPUT].setVoltage((octave * 1200.f + scl[bestIdx]) / 1200.f, c);
+			}
 		}
 		outputs[PITCH_OUTPUT].setChannels(channels);
+		this->playing = playing;
 	}
 
 	std::string getDescription() const {
@@ -337,8 +365,8 @@ struct SCLRNG : Module {
 };
 
 
-/** Scale description, drawn vertically to fit the narrow panel. */
-struct SCLDisplay : LedDisplay {
+/** Scale description, drawn vertically. */
+struct SCLNameDisplay : LedDisplay {
 	SCLRNG* module;
 
 	void drawLayer(const DrawArgs& args, int layer) override {
@@ -353,27 +381,226 @@ struct SCLDisplay : LedDisplay {
 		if (!font)
 			return;
 		nvgFontFaceId(args.vg, font->handle);
-		nvgTextAlign(args.vg, NVG_ALIGN_MIDDLE | NVG_ALIGN_CENTER);
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
-		// Shrink the font so the whole name fits the display height
 		float bounds[4];
 		nvgFontSize(args.vg, 10);
 		nvgTextBounds(args.vg, 0, 0, text.c_str(), NULL, bounds);
 		float length = bounds[2] - bounds[0];
-		float maxLength = box.size.y - mm2px(4);
+		float maxLength = box.size.y - mm2px(2);
 		float fontSize = 10;
 		if (length > maxLength)
-			fontSize = std::max(6.f, 10.f * maxLength / length);
+			fontSize = std::max(5.f, 10.f * maxLength / length);
+		// Cap by the column width
+		fontSize = std::min(fontSize, box.size.x / 1.2f);
 		nvgFontSize(args.vg, fontSize);
 
 		nvgFillColor(args.vg, nvgRGB(0xff, 0xff, 0xff));
 
-		// Vertical text, reading from bottom to top
+		// Anchored to the bottom of the column (the text reads upward)
 		nvgSave(args.vg);
-		nvgTranslate(args.vg, box.size.x / 2, box.size.y / 2);
+		nvgTranslate(args.vg, box.size.x / 2, box.size.y - mm2px(1));
 		nvgRotate(args.vg, -M_PI / 2);
-		nvgText(args.vg, 0, 0, text.c_str(), NULL);
+		nvgText(args.vg, 0.01f * box.size.y, 0, text.c_str(), NULL);
 		nvgRestore(args.vg);
+	}
+};
+
+
+/** One toggleable tone strip in the scale display. */
+struct SCLToneButton : OpaqueWidget {
+	SCLRNG* module;
+	int index;
+
+	void drawLayer(const DrawArgs& args, int layer) override {
+		if (layer != 1)
+			return;
+
+		Rect r = box.zeroPos();
+		float radius = std::min(1.5f, box.size.y / 2);
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, RECT_ARGS(r), radius);
+
+		std::lock_guard<std::mutex> lock(module->scaleMutex);
+		int n = (int) module->scale.size();
+		if (index >= n)
+			return;
+		if (module->playing[index])
+			nvgFillColor(args.vg, SCHEME_YELLOW);
+		else if (module->enabled[index])
+			nvgFillColor(args.vg, nvgRGB(0x7f, 0x6b, 0x0a));
+		else
+			nvgFillColor(args.vg, nvgRGB(0x40, 0x40, 0x40));
+		nvgFill(args.vg);
+	}
+
+	void onDragStart(const event::DragStart& e) override {
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+			std::lock_guard<std::mutex> lock(module->scaleMutex);
+			if (index < (int) module->enabled.size())
+				module->enabled[index] = !module->enabled[index];
+		}
+		OpaqueWidget::onDragStart(e);
+	}
+
+	void onDragEnter(const event::DragEnter& e) override {
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+			SCLToneButton* origin = dynamic_cast<SCLToneButton*>(e.origin);
+			if (origin) {
+				std::lock_guard<std::mutex> lock(module->scaleMutex);
+				if (index < (int) module->enabled.size() && origin->index < (int) module->enabled.size())
+					module->enabled[index] = module->enabled[origin->index];
+			}
+		}
+		OpaqueWidget::onDragEnter(e);
+	}
+};
+
+
+/** Per-bar thickness: normal size, thinned only where tones overlap. */
+static void computeBarLayout(const std::vector<float>& scl, float boxH, std::vector<float>& tops, std::vector<float>& thick) {
+	float inset = 0.02f * boxH;
+	float usable = boxH - 2 * inset;
+	float barHDefault = mm2px(0.768);
+	float minBarH = barHDefault * 0.5f;
+	int n = (int) scl.size();
+	tops.resize(n);
+	thick.assign(n, barHDefault);
+	for (int i = 0; i < n; i++) {
+		tops[i] = inset + (scl[i] / 1200.f) * (usable - barHDefault);
+	}
+	for (int i = 0; i < n; i++) {
+		float roomNext = (i < n - 1) ? (tops[i + 1] - tops[i]) : 1e9f;
+		float roomPrev = (i > 0) ? (tops[i] - (tops[i - 1] + thick[i - 1])) : 1e9f;
+		float t = std::min(barHDefault, std::min(roomNext, roomPrev));
+		thick[i] = std::max(t, minBarH);
+	}
+}
+
+
+/** Tone strips, positioned proportionally to their cents within the octave. */
+struct SCLScaleDisplay : LedDisplay {
+	SCLRNG* module;
+	std::vector<SCLToneButton*> buttons;
+
+	void rebuild(int n) {
+		for (SCLToneButton* b : buttons) {
+			removeChild(b);
+			delete b;
+		}
+		buttons.clear();
+		for (int i = 0; i < n; i++) {
+			SCLToneButton* b = new SCLToneButton();
+			b->module = module;
+			b->index = i;
+			addChild(b);
+			buttons.push_back(b);
+		}
+	}
+
+	void layout(const std::vector<float>& scl) {
+		std::vector<float> tops, thick;
+		computeBarLayout(scl, box.size.y, tops, thick);
+		float padX = mm2px(0.85);
+		for (int i = 0; i < (int) scl.size(); i++) {
+			buttons[i]->box.pos = Vec(padX, tops[i]);
+			buttons[i]->box.size = Vec(box.size.x - 2 * padX, thick[i]);
+		}
+	}
+
+	void step() override {
+		if (module) {
+			std::vector<float> scl;
+			{
+				std::lock_guard<std::mutex> lock(module->scaleMutex);
+				scl = module->scale;
+			}
+			if ((int) scl.size() != (int) buttons.size())
+				rebuild((int) scl.size());
+			layout(scl);
+		}
+		LedDisplay::step();
+	}
+};
+
+
+/** Cents values of the current scale, listed vertically. */
+struct SCLValuesDisplay : LedDisplay {
+	SCLRNG* module;
+
+	void drawLayer(const DrawArgs& args, int layer) override {
+		if (layer != 1 || !module)
+			return;
+
+		std::vector<float> scl;
+		std::vector<int> enabled;
+		{
+			std::lock_guard<std::mutex> lock(module->scaleMutex);
+			scl = module->scale;
+			enabled = module->enabled;
+		}
+		int n = (int) scl.size();
+		if (n == 0)
+			return;
+
+		std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/fonts/RobotoCondensed-Regular.ttf"));
+		if (!font)
+			return;
+		nvgFontFaceId(args.vg, font->handle);
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+
+		float h = box.size.y;
+		float xOffset = mm2px(0.5) + 0.1f * box.size.x;
+
+		float fontSize = 5.44f;
+		nvgFontSize(args.vg, fontSize);
+
+		// Shrink so the widest value fits the column
+		float maxW = 0.f;
+		for (int i = 0; i < n; i++) {
+			std::string s = string::f("%.2f", scl[i]);
+			float bounds[4];
+			nvgTextBounds(args.vg, 0, 0, s.c_str(), NULL, bounds);
+			maxW = std::max(maxW, bounds[2] - bounds[0]);
+		}
+		float maxTextW = box.size.x - xOffset;
+		if (maxW > maxTextW)
+			fontSize = std::max(2.72f, fontSize * maxTextW / maxW);
+		nvgFontSize(args.vg, fontSize);
+
+		// Bar-aligned label centers
+		std::vector<float> tops, thick;
+		computeBarLayout(scl, h, tops, thick);
+		std::vector<float> y(n);
+		for (int i = 0; i < n; i++) {
+			y[i] = tops[i] + thick[i] / 2;
+		}
+
+		// Spread overlapping labels apart; if they still do not fit, shrink the font
+		while (true) {
+			float labelH = fontSize * 0.8f;
+			std::vector<float> yy = y;
+			for (int i = 1; i < n; i++) {
+				float minY = yy[i - 1] + labelH;
+				if (yy[i] < minY)
+					yy[i] = minY;
+			}
+			if (yy[n - 1] + labelH / 2 <= h || fontSize <= 2.f) {
+				y = yy;
+				break;
+			}
+			fontSize *= 0.85f;
+			nvgFontSize(args.vg, fontSize);
+		}
+
+		for (int i = 0; i < n; i++) {
+			if (i < (int) enabled.size() && !enabled[i])
+				nvgFillColor(args.vg, nvgRGB(0x40, 0x40, 0x40));
+			else
+				nvgFillColor(args.vg, nvgRGB(0xff, 0xff, 0xff));
+			std::string s = string::f("%.2f", scl[i]);
+			nvgText(args.vg, xOffset, y[i], s.c_str(), NULL);
+		}
 	}
 };
 
@@ -482,11 +709,23 @@ struct SCLRNGWidget : ModuleWidget {
 		rightButton->left = false;
 		addChild(rightButton);
 
-		// Scale name display
-		SCLDisplay* display = createWidget<SCLDisplay>(mm2px(Vec(3.048, 21.5)));
-		display->box.size = mm2px(Vec(14.224, 84));
-		display->module = module;
-		addChild(display);
+		// Scale name (left 1/5)
+		SCLNameDisplay* nameDisplay = createWidget<SCLNameDisplay>(mm2px(Vec(1.625, 21.5)));
+		nameDisplay->box.size = mm2px(Vec(3.414, 84));
+		nameDisplay->module = module;
+		addChild(nameDisplay);
+
+		// Tone strips (middle 2/5)
+		SCLScaleDisplay* scaleDisplay = createWidget<SCLScaleDisplay>(mm2px(Vec(5.039, 21.5)));
+		scaleDisplay->box.size = mm2px(Vec(6.828, 84));
+		scaleDisplay->module = module;
+		addChild(scaleDisplay);
+
+		// Cents values (right 2/5)
+		SCLValuesDisplay* valuesDisplay = createWidget<SCLValuesDisplay>(mm2px(Vec(11.867, 21.5)));
+		valuesDisplay->box.size = mm2px(Vec(6.828, 84));
+		valuesDisplay->module = module;
+		addChild(valuesDisplay);
 
 		// Jacks
 		addInput(createInputCentered<ThemedPJ301MPort>(mm2px(Vec(5.08, 112.5)), module, SCLRNG::PITCH_INPUT));
